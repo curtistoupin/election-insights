@@ -9,11 +9,45 @@ from math import comb as choose
 from itertools import product
 from tqdm import tqdm
 
+DEM = 1
+REP = 0
+
 def polls_conditional_prob(N, n, *polls):
     p = 1
     for poll in polls:
         p *= choose(n, sum(poll))*choose(N-n, len(poll)-sum(poll))/choose(N, len(poll))
     return p
+
+def calculate_posterior(polls, 
+                        N_min = 900000,
+                        N_max = 1100000,
+                        N_resolution = 10000,
+                        pc_min = 0.4,
+                        pc_max = 0.6,
+                        n_resolution = 5000,
+                        print_flag = True):
+    possible_N = list(range(int(N_min/N_resolution)*N_resolution,
+                           int(N_max/N_resolution)*N_resolution + N_resolution,
+                           N_resolution))
+    n_min = pc_min*N_min
+    n_max = pc_max*N_max
+    possible_n = list(range(int(n_min/n_resolution)*n_resolution,
+                            int(n_max/n_resolution)*n_resolution,
+                            n_resolution))
+    p_N_n = 1/(len(possible_N)*len(possible_n))
+    posterior_dist = {}
+    
+    p_range = tqdm(product(possible_N, possible_n)) if print_flag else product(possible_N, possible_n)
+    marginal_likelihood = 0
+    for N, n in p_range:
+        marginal_likelihood += polls_conditional_prob(N, n, *polls)*p_N_n
+        
+    p_range = tqdm(product(possible_N, possible_n)) if print_flag else product(possible_N, possible_n)  
+    for N, n in p_range:
+        prior = polls_conditional_prob(N, n, *polls) * p_N_n
+        posterior_dist[(N, n)] = prior/marginal_likelihood
+    
+    
 
 def run_trial(print_flag = True):
     pop_pc = round(rd.gauss(0.5, 0.005), 5)
@@ -22,33 +56,13 @@ def run_trial(print_flag = True):
     pop_total = 1000000
     pop = [DEM]*int(pop_pc*pop_total) + [REP]*int(round((1-pop_pc), 5)*pop_total)
     
-    n_poll = 10
+    n_poll = 100
     polls = []
     for i in range(n_poll):
         poll_size = rd.randint(800, 1200)
         polls.append(rd.sample(pop, poll_size))
     
-    N_resolution = 10000
-    possible_N = list(range(int(round(0.9*pop_total/N_resolution)*N_resolution), 
-                            int(round(1.1*pop_total/N_resolution)*N_resolution) + N_resolution, 
-                            10000))                                                          
-    n_resolution = 5000
-    possible_n = list(range(int(round(0.4*pop_total/n_resolution)*n_resolution), 
-                            int(round(0.6*pop_total/n_resolution)*n_resolution) + n_resolution, 
-                            10000))
-    
-    p_N_n = 1/(len(possible_N)*len(possible_n))
-    posterior = {}
-    
-    p_range = tqdm(product(possible_N, possible_n)) if print_flag else product(possible_N, possible_n)
-    marginal_likelihood = 0
-    for N, n in p_range:
-        marginal_likelihood += polls_conditional_prob(N, n, *polls)*p_N_n
-    
-    p_range = tqdm(product(possible_N, possible_n)) if print_flag else product(possible_N, possible_n)  
-    for N, n in p_range:
-        prior = polls_conditional_prob(N, n, *polls) * p_N_n
-        posterior[(N, n)] = prior/marginal_likelihood
+    posterior = calculate_posterior(polls)
         
     highest_likelihood = max(posterior, key=posterior.get)
     est_N = highest_likelihood[0]
@@ -63,6 +77,9 @@ def run_trial(print_flag = True):
     return (est_N, est_n, est_p, pop_pc)
 
 results = []
-n_trial = 1500
-for trial in tqdm(range(n_trial)):
-    results.append(run_trial(False))
+n_trial = 1
+print_flag = True
+
+trial_range = range(n_trial) if print_flag else tqdm(range(n_trial))
+for trial in trial_range:
+    results.append(run_trial(True))

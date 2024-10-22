@@ -1,0 +1,57 @@
+state,pop_min,pop_max,pc_min,pc_max,votes,safe_blue,safe_red,short_name
+Alabama,,,,,9,0,1,AL
+Alaska,280000,400000,0.42,0.48,3,0,1,AK
+Arizona,2420000,3500000,0.45,0.55,11,0,0,AZ
+Arkansas,,,,,6,0,1,AR
+California,,,,,54,1,0,CA
+Colorado,,,,,10,1,0,CO
+Connecticut,,,,,7,1,0,CT
+Delaware,,,,,3,1,0,DE
+District of Columbia,,,,,3,1,0,DC
+Florida,,,,,30,0,1,FL
+Georgia,3967000,5000000,0.45,0.55,16,0,0,GA
+Hawaii,,,,,4,1,0,HI
+Idaho,,,,,4,0,1,ID
+Illinois,,,,,19,1,0,IL
+Indiana,,,,,11,0,1,IN
+Iowa,,,,,6,0,1,IA
+Kansas,,,,,6,0,1,KS
+Kentucky,,,,,8,0,1,KY
+Louisiana,,,,,8,0,1,LA
+Maine,,,,,2,1,0,ME
+Maine CD-1,,,,,1,1,0,ME-1
+Maine CD-2,,,,,1,0,1,ME-2
+Maryland,,,,,10,1,0,MD
+Massachusetts,,,,,11,1,0,MA
+Michigan,4547000,5500000,0.45,0.55,15,0,0,MI
+Minnesota,,,,,10,1,0,MN
+Mississippi,,,,,6,0,1,MS
+Missouri,,,,,10,0,1,MO
+Montana,,,,,4,0,1,MT
+Nebraska,,,,,2,0,1,NE
+Nebraska CD-1,,,,,1,0,1,NE-1
+Nebraska CD-2,,,,,1,1,0,NE-2
+Nebraska CD-3,,,,,1,0,1,NE-3
+Nevada,1051000,1500000,0.45,0.55,6,0,0,NV
+New Hampshire,,,,,4,1,0,NH
+New Jersey,,,,,14,1,0,NJ
+New Mexico,,,,,5,1,0,NM
+New York,,,,,28,1,0,NY
+North Carolina,4551000,5500000,0.45,0.55,16,0,0,NC
+North Dakota,,,,,3,0,1,ND
+Ohio,,,,,17,0,1,OH
+Oklahoma,,,,,7,0,1,OK
+Oregon,,,,,8,1,0,OR
+Pennsylvania,5897000,7000000,0.45,0.55,19,0,0,PA
+Rhode Island,,,,,4,1,0,RI
+South Carolina,,,,,9,0,1,SC
+South Dakota,,,,,3,0,1,SD
+Tennessee,,,,,11,0,1,TN
+Texas,,,,,40,0,1,TX
+Utah,,,,,6,0,1,UT
+Vermont,,,,,3,1,0,VT
+Virginia,,,,,13,1,0,VA
+Washington,,,,,12,1,0,WA
+West Virginia,,,,,4,0,1,WV
+Wisconsin,2787000,3500000,0.45,0.55,10,0,0,WI
+Wyoming,,,,,3,0,1,WY
