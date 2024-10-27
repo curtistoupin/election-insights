@@ -12,7 +12,8 @@ from math import comb as choose
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
+import random as rd
 
 class PollReader():
     
@@ -69,12 +70,7 @@ class PollReader():
             self.states_data[state]['safe_blue'] = bool(self.metadata.safe_blue[i])
             self.states_data[state]['safe_red'] = bool(self.metadata.safe_red[i])
             self.states_data[state]['abbrev'] = self.metadata.short_name[i]
-            self.states_data[state]['history'] = None if self.states_data[state]['pop_min'] is None else self.states_data[state].get('history', {self.most_recent_event: self.uniform_prior(self.states_data[state]['pop_min'], 
-                                                                                                                                                                                            self.states_data[state]['pop_max'],
-                                                                                                                                                                                            10000,
-                                                                                                                                                                                            self.states_data[state]['pc_min'],
-                                                                                                                                                                                            self.states_data[state]['pc_max'],
-                                                                                                                                                                                            1000)})
+            self.states_data[state]['history'] = None if self.states_data[state]['pop_min'] is None else self.states_data[state].get('history', {self.most_recent_event: self.uniform_prior(state=state)})
             self.states_data[state]['dist_history'] = None if self.states_data[state]['pop_min'] is None else self.states_data[state].get('dist_history', {self.most_recent_event: self.vote_dist(self.states_data[state]['history'][self.most_recent_event])})
         with open('states_data.txt', 'w') as file:
             file.write(str(self.states_data))
@@ -91,7 +87,7 @@ class PollReader():
                       pc_min = None,
                       pc_max = None,
                       N_resolution = 10000,
-                      n_resolution = 5000,
+                      n_resolution = 1000,
                       state = None,
                       print_flag = False):
         if any([N_min is None, N_max is None, pc_min is None, pc_max is None]) and state is None:
@@ -161,6 +157,7 @@ class PollReader():
         p_dem_win = round(100 * sum([v for k, v in sorted_p_dist.items() if k >= 50]), 1)
         highest_p = max(p_dist, key=p_dist.get)
         highest_p_winner = self.rep_candidate if highest_p < 50 else self.dem_candidate
+        winner_class = 'rep-vote' if highest_p < 50 else 'dem-vote'
         highest_p = max(highest_p, 100-highest_p)
         winner = self.rep_candidate if p_dem_win < 50 else self.dem_candidate
         winner_p = max(p_dem_win, 100-p_dem_win)
@@ -168,6 +165,14 @@ class PollReader():
         winner_possessive = winner + ("'" if winner[-1] == "s" else "'s")
         winner_ci_min = ci[0] if winner == self.dem_candidate else 100 - ci[1]
         winner_ci_max = ci[1] if winner == self.dem_candidate else 100 - ci[0]
+        if state_name == 'Example':
+            title = "2024 Election Forecast Simulation"
+        else:
+            title = f"2024 Election Forecast for {state_name}"
+        if state_name == 'Example':
+            projection = f"There is a projected <span class='{winner_class}'>{winner_p}%</span> chance that <span class='{winner_class}'>{winner}</span> wins this simulation."
+        else:
+            projection = f"There is a projected <span class='{winner_class}'>{winner_p}%</span> chance that <span class='{winner_class}'>{winner}</span> wins {state_name}."
         data = {
             'keys': keys,
             'values': values,
@@ -176,8 +181,8 @@ class PollReader():
             'ci_max': ci[1],
             'ci_p': ci[2],
             'p_dem_win': p_dem_win,
-            'title': f"2024 Election Forecast for {state_name}",
-            'projection': f"There is a projected {winner_p}% chance that {winner} wins {state_name}.",
+            'title': title,
+            'projection': projection,
             'most_likely': f"The most likely outcome is {highest_p_winner} winning with {highest_p}% of the head-to-head vote share.",
             'confidence': f"With {ci[2]}% confidence, {winner_possessive} head-to-head vote share will be between {winner_ci_min}% and {winner_ci_max}%.",
             'state_name': state_name,
@@ -188,7 +193,6 @@ class PollReader():
         return(json_data)
     
     def poll_data_html(self, state):
-        state_polls = self.h2h_polls.loc[[i for i in self.h2h_polls.index if self.h2h_polls.state[i] == state]]
         pop_key = {'lv': 'likely voters',
                    'rv': 'registered voters'}
         month_key = {'01': 'Jan',
@@ -204,44 +208,84 @@ class PollReader():
                      '11': 'Nov',
                      '12': 'Dec'}
         poll_data = []
-        for unq in set(state_polls.unq):
-            poll_df = state_polls.loc[[i for i in state_polls.index if state_polls.unq[i] == unq]]
-            sample_size = int(poll_df.sample_size.iloc[0])
-            population = pop_key[poll_df.population.iloc[0]]
-            start_year, start_month, start_day = poll_df.start_date.iloc[0].split('-')
-            end_year, end_month, end_day = poll_df.end_date.iloc[0].split('-')
-            if start_year == end_year and start_month == end_month:
-                poll_date = month_key[start_month] + ' ' + start_day + ' - ' + end_day
-            else:
-                poll_date = month_key[start_month] + ' ' + start_day + ' - ' + month_key[end_month] + ' ' + end_day
-            pollster = poll_df.pollster.iloc[0]
-            dem_candidate = poll_df[poll_df.party == 'DEM'].candidate_name.iloc[0]
-            rep_candidate = poll_df[poll_df.party == 'REP'].candidate_name.iloc[0]
-            dem_vote = poll_df[poll_df.party == 'DEM'].pct.iloc[0]
-            if dem_vote == int(dem_vote):
-                dem_vote = int(dem_vote)
-            rep_vote = poll_df[poll_df.party == 'REP'].pct.iloc[0]
-            if rep_vote == int(rep_vote):
-                rep_vote = int(rep_vote)
-            dem_head_to_head = round(100*dem_vote/(rep_vote + dem_vote), 1)
-            rep_head_to_head = round(100*rep_vote/(rep_vote + dem_vote), 1)
-            pollster_rating = poll_df.numeric_grade.iloc[0]
-            pr_int = pollster_rating//1
-            pr_frac = pollster_rating - pr_int
-            pr_frac += 0.25*(1-2*pr_frac) if pr_frac > 0 else pr_frac
-            pollster_rating_visual = pr_int + pr_frac
-            poll_data.append({
-                'pollster_name': pollster,
-                'poll_date': poll_date,
-                'pollster_rating': pollster_rating,
-                'pollster_rating_visual': pollster_rating_visual,
-                'dem_candidate': dem_candidate.split(' ')[-1],
-                'dem_vote': f"{dem_vote}%",
-                'rep_candidate': rep_candidate.split(' ')[-1],
-                'rep_vote': f"{rep_vote}%",
-                'dem_head_to_head': f"{dem_head_to_head}%",
-                'rep_head_to_head': f"{rep_head_to_head}%",
-                'date': poll_df.end_date.iloc[0]})
+        if state == 'Example':
+            for date, poll_list in self.eg_polls.items():
+                for poll in poll_list:
+                    sample_size = len(poll)
+                    start_year, start_month, start_day = date.split('-')
+                    end_year, end_month, end_day = date.split('-')
+                    if start_year == end_year and start_month == end_month:
+                        poll_date = month_key[start_month] + ' ' + start_day + ' - ' + end_day
+                    else:
+                        poll_date = month_key[start_month] + ' ' + start_day + ' - ' + month_key[end_month] + ' ' + end_day
+                    pollster = 'Example'
+                    dem_candidate = self.dem_candidate
+                    rep_candidate = self.rep_candidate
+                    dem_vote = round(100*sum(poll)/len(poll), 1)
+                    if dem_vote == int(dem_vote):
+                        dem_vote = int(dem_vote)
+                    rep_vote = 100 - dem_vote
+                    if rep_vote == int(rep_vote):
+                        rep_vote = int(rep_vote)
+                    dem_head_to_head = dem_vote
+                    rep_head_to_head = rep_vote
+                    pollster_rating = 3
+                    pr_int = pollster_rating//1
+                    pr_frac = pollster_rating - pr_int
+                    pr_frac += 0.25*(1-2*pr_frac) if pr_frac > 0 else pr_frac
+                    pollster_rating_visual = pr_int + pr_frac
+                    poll_data.append({
+                        'pollster_name': pollster,
+                        'poll_date': poll_date,
+                        'pollster_rating': pollster_rating,
+                        'pollster_rating_visual': pollster_rating_visual,
+                        'dem_candidate': dem_candidate.split(' ')[-1],
+                        'dem_vote': f"{dem_vote}%",
+                        'rep_candidate': rep_candidate.split(' ')[-1],
+                        'rep_vote': f"{rep_vote}%",
+                        'dem_head_to_head': f"{dem_head_to_head}%",
+                        'rep_head_to_head': f"{rep_head_to_head}%",
+                        'date': date})
+        else:
+            state_polls = self.h2h_polls.loc[[i for i in self.h2h_polls.index if self.h2h_polls.state[i] == state]]
+            for unq in set(state_polls.unq):
+                poll_df = state_polls.loc[[i for i in state_polls.index if state_polls.unq[i] == unq]]
+                sample_size = int(poll_df.sample_size.iloc[0])
+                population = pop_key[poll_df.population.iloc[0]]
+                start_year, start_month, start_day = poll_df.start_date.iloc[0].split('-')
+                end_year, end_month, end_day = poll_df.end_date.iloc[0].split('-')
+                if start_year == end_year and start_month == end_month:
+                    poll_date = month_key[start_month] + ' ' + start_day + ' - ' + end_day
+                else:
+                    poll_date = month_key[start_month] + ' ' + start_day + ' - ' + month_key[end_month] + ' ' + end_day
+                pollster = poll_df.pollster.iloc[0]
+                dem_candidate = poll_df[poll_df.party == 'DEM'].candidate_name.iloc[0]
+                rep_candidate = poll_df[poll_df.party == 'REP'].candidate_name.iloc[0]
+                dem_vote = poll_df[poll_df.party == 'DEM'].pct.iloc[0]
+                if dem_vote == int(dem_vote):
+                    dem_vote = int(dem_vote)
+                rep_vote = poll_df[poll_df.party == 'REP'].pct.iloc[0]
+                if rep_vote == int(rep_vote):
+                    rep_vote = int(rep_vote)
+                dem_head_to_head = round(100*dem_vote/(rep_vote + dem_vote), 1)
+                rep_head_to_head = round(100*rep_vote/(rep_vote + dem_vote), 1)
+                pollster_rating = poll_df.numeric_grade.iloc[0]
+                pr_int = pollster_rating//1
+                pr_frac = pollster_rating - pr_int
+                pr_frac += 0.25*(1-2*pr_frac) if pr_frac > 0 else pr_frac
+                pollster_rating_visual = pr_int + pr_frac
+                poll_data.append({
+                    'pollster_name': pollster,
+                    'poll_date': poll_date,
+                    'pollster_rating': pollster_rating,
+                    'pollster_rating_visual': pollster_rating_visual,
+                    'dem_candidate': dem_candidate.split(' ')[-1],
+                    'dem_vote': f"{dem_vote}%",
+                    'rep_candidate': rep_candidate.split(' ')[-1],
+                    'rep_vote': f"{rep_vote}%",
+                    'dem_head_to_head': f"{dem_head_to_head}%",
+                    'rep_head_to_head': f"{rep_head_to_head}%",
+                    'date': poll_df.end_date.iloc[0]})
             
         poll_data = reversed(sorted(poll_data, key=lambda x: x['date']))
         tbody = etree.Element("tbody")
@@ -312,12 +356,7 @@ class PollReader():
                 poll = [1]*(int(dem_stats.sample_size.iloc[0]*dem_stats.pct.iloc[0]/100 + 1)) + [0]*(int(rep_stats.sample_size.iloc[0]*rep_stats.pct.iloc[0]/100 + 1))
                 polls.append(poll)
             posterior = self.update_posterior(polls,
-                                              self.uniform_prior(N_min = self.states_data[state]['pop_min'],
-                                                                 N_max = self.states_data[state]['pop_max'],
-                                                                 N_resolution = 10000,
-                                                                 pc_min = self.states_data[state]['pc_min'],
-                                                                 pc_max = self.states_data[state]['pc_max'],
-                                                                 n_resolution = 1000,
+                                              self.uniform_prior(state=state,
                                                                  print_flag = True))
             self.states_data[state]['posterior'] = posterior
             self.states_data[state]['vote_dist'] = self.vote_dist(posterior)
@@ -361,12 +400,7 @@ class PollReader():
         print(f"Based on well-rated pollsters since the presdiential debate, there is a {round(100*self.p_dem_win, 1)}% chance of a Kamala Harris win in the electoral college and a {round(100*self.p_tie, 1)}% chance of a tie.")
     
     def erase_history(self, state):
-        self.states_data[state]['history'] = None if self.states_data[state]['pop_min'] is None else {self.most_recent_event: self.uniform_prior(self.states_data[state]['pop_min'], 
-                                                                                                                                                 self.states_data[state]['pop_max'],
-                                                                                                                                                 10000,
-                                                                                                                                                 self.states_data[state]['pc_min'],
-                                                                                                                                                 self.states_data[state]['pc_max'],
-                                                                                                                                                 1000)}
+        self.states_data[state]['history'] = None if self.states_data[state]['pop_min'] is None else {self.most_recent_event: self.uniform_prior(state=state)}
         self.states_data[state]['dist_history'] = None if self.states_data[state]['pop_min'] is None else {self.most_recent_event: self.vote_dist(self.states_data[state]['history'][self.most_recent_event])}
         self.save()
         
@@ -395,13 +429,17 @@ class PollReader():
             file.write(str(self.states_data))
     
     def update_from_scratch(self, state):
+        self.erase_history(state)
         most_recent_prior_date = max(self.states_data[state]['history'])
-        uniform = self.uniform_prior(state = state)
+        uniform = self.uniform_prior(state = state, N_resolution = 20000, n_resolution = 5000)
         new_polls = self.h2h_polls.loc[[i for i in self.h2h_polls.index if self.h2h_polls.end_date[i] >= most_recent_prior_date and self.h2h_polls.state[i] == state]]
         new_polls = new_polls.sort_values(by='end_date', ascending=True)
         tot = len(set(new_polls.end_date))
+        today = datetime.today().strftime('%Y-%m-%d')
+        today_prior = self.uniform_prior(state=state)
         i = 0
-        for end_date in set(new_polls.end_date):
+        for end_date in sorted(list(set(new_polls.end_date).union([today]))):
+            prior_to_use = today_prior if end_date == today else uniform
             i += 1
             print(i, 'of', tot, '-', end_date)
             date_polls = new_polls[new_polls.end_date <= end_date]
@@ -411,8 +449,48 @@ class PollReader():
                 rep_stats = date_polls.loc[[i for i in date_polls.index if date_polls.candidate_name[i] == 'Donald Trump' and date_polls.unq[i] == uid]]
                 poll = [1]*(int(dem_stats.sample_size.iloc[0]*dem_stats.pct.iloc[0]/100 + 1)) + [0]*(int(rep_stats.sample_size.iloc[0]*rep_stats.pct.iloc[0]/100 + 1))
                 polls.append(poll)
-            self.states_data[state]['history'][end_date] = self.update_posterior(polls, uniform)
+            self.states_data[state]['history'][end_date] = self.update_posterior(polls, prior_to_use)
             self.states_data[state]['dist_history'][end_date] = self.vote_dist(self.states_data[state]['history'][end_date])
+        
+        
+        self.save()
+    
+    def update_example_from_scratch(self):
+        state = 'Example'
+        start_date = self.most_recent_event
+        uniform = self.uniform_prior(state = state, N_resolution = 10000, n_resolution = 3000)
+        today = datetime.today().strftime('%Y-%m-%d')
+        date = datetime.strptime(start_date, '%Y-%m-%d')
+        i = 0
+        n_poll = '22ish'
+        self.states_data[state]['history'] = {date.strftime('%Y-%m-%d'): uniform}
+        self.states_data[state]['dist_history'] = {date.strftime('%Y-%m-%d'): self.vote_dist(uniform)}
+        self.states_data[state]['polls'] = []
+        day_skip = rd.sample([2,3,4], 1)[0]
+        date += timedelta(days=day_skip)
+        true_population = int(self.states_data[state]['pop_min'] + 0.897564321*(self.states_data[state]['pop_max'] - self.states_data[state]['pop_min']))
+        true_proportion = 0.505
+        true_n_dem = int(true_population*true_proportion)
+        true_n_rep = true_population - true_n_dem
+        sample_population = [1]*true_n_dem + [0]*true_n_rep
+        self.eg_polls = {}
+        while date < datetime.today():
+            day_skip = rd.sample([2,2,2,3,3,4], 1)[0]
+            day_n_polls = rd.sample([1,1,1,2,2,2,2], 1)[0]
+            i += 1
+            print(i, 'of', n_poll, '-', date)
+            for poll_i in range(day_n_polls):
+                poll_size = rd.sample([len(p) for p in self.states_data['Pennsylvania']['polls']], 1)[0]
+                poll = rd.sample(sample_population, poll_size)
+                self.states_data[state]['polls'].append(poll)
+                self.eg_polls[date.strftime('%Y-%m-%d')] = self.eg_polls.get(date.strftime('%Y-%m-%d'), []) + [poll]
+            self.states_data[state]['history'][date.strftime('%Y-%m-%d')] = self.update_posterior(self.states_data[state]['polls'], uniform)
+            self.states_data[state]['dist_history'][date.strftime('%Y-%m-%d')] = self.vote_dist(self.states_data[state]['history'][date.strftime('%Y-%m-%d')])
+            date += timedelta(days = day_skip)
+        i += 1
+        print(i, 'of', n_poll, '-', today)
+        self.states_data[state]['history'][today] = self.update_posterior(self.states_data[state]['polls'], self.uniform_prior(state = state, N_resolution = 10000, n_resolution = 1000))
+        self.states_data[state]['dist_history'][today] = self.vote_dist(self.states_data[state]['history'][today])
         self.save()
     
     def get_history_data(self, state):
@@ -442,9 +520,10 @@ class PollReader():
         return(js_input)
     
 p = PollReader()
-for state in p.swing_states:
+for state in p.swing_states[-2:]:
+    print('-------------', state, '------------')
     p.update_from_scratch(state)
-#state = 'Wisconsin'
+#p.update_example_from_scratch()
 #p.get_history_data(state)
 #p.webpage_json_data(state)
 #p.poll_data_html(state)
